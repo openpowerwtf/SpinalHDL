@@ -34,7 +34,9 @@ import scala.collection.mutable.ArrayBuffer
 
 trait StateMachineAccessor {
 
-  def setEntry(state: State): Unit
+  //def setEntry(state: State): Unit
+  def setEntry(state: State, instant : Boolean = false): Unit
+
   def getEntry(): State
 
   def isActive(state: State): Bool
@@ -169,9 +171,21 @@ class StateMachine extends Area with StateMachineAccessor with ScalaLocated {
 
   var stateBoot : State = new State()(this).setCompositeName(this, "BOOT", Nameable.DATAMODEL_WEAK)
 
-  def makeInstantEntry(): State ={
-    setEntry(stateBoot.unsetName())
-    stateBoot
+  def getBootState() : State = stateBoot
+
+  def makeInstantEntry(): State = {
+   if (entryState == null) {
+      setEntry(stateBoot.unsetName())
+   } else {  // replace stateBoot and remove it from enum
+      stateBoot = entryState
+      states.remove(0)
+   }
+   stateBoot
+  }
+
+  @dontName var stateRegName : String = null
+  def setStateRegName(n : String) {
+   stateRegName = n
   }
 
   var builded = false
@@ -195,12 +209,16 @@ class StateMachine extends Area with StateMachineAccessor with ScalaLocated {
     OwnableRef.proposal(stateReg, this)
     OwnableRef.proposal(stateNext, this)
 
-    stateReg.setPartialName("stateReg")
+    if (stateRegName == null) {
+       stateReg.setPartialName("stateReg")
+    } else {
+       stateReg.setName(stateRegName)
+    }
     stateNext.setPartialName("stateNext")
     if (transitionCond != null)
       stateNextCand.setPartialName("stateNextCand")
 
-    for(state <- states){
+     for(state <- states){
       checkState(state)
       val enumElement = enumDef.newElement().setLambdaName(state.isNamed && this.isNamed)(
         Nameable.getNameWithoutPrefix(prefix = this, from = state)
@@ -293,10 +311,10 @@ class StateMachine extends Area with StateMachineAccessor with ScalaLocated {
     }
   }
 
-
-  override def setEntry(state: State): Unit = {
+  override def setEntry(state: State, instant : Boolean = false): Unit = {
     assert(entryState == null, "Entry point already set !")
     entryState = state
+    if (instant) makeInstantEntry()
   }
 
   override def getEntry(): State = entryState
